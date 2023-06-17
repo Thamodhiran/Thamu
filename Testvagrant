@@ -1,1 +1,123 @@
+import java.util.*;
 
+public class User {
+private String name;
+
+    public User(String name) {
+      this.name = name;
+
+    }
+
+public String getName() {
+
+        return name;
+
+    }
+
+}
+
+public class Song {
+
+    private String title;
+
+    public Song(String title) {
+
+        this.title = title;
+
+    }
+
+    public String getTitle() {
+
+        return title;
+
+    }
+
+}
+
+public class RecentlyPlayedStore {
+
+    private int capacity;
+
+    private Map<User, LinkedList<Song>> store;
+
+    public RecentlyPlayedStore(int capacity) {
+
+        this.capacity = capacity;
+
+        this.store = new HashMap<>();
+
+    }
+
+    public void addSong(User user, Song song) {
+
+        if (!store.containsKey(user)) {
+
+            store.put(user, new LinkedList<>());
+
+        }
+
+        LinkedList<Song> songs = store.get(user);
+
+        songs.addFirst(song);
+
+        if (songs.size() > capacity) {
+
+            songs.removeLast();
+
+        }
+
+    }
+
+    public List<Song> getRecentlyPlayedSongs(User user) {
+
+        if (store.containsKey(user)) {
+
+            return store.get(user);
+
+        }
+
+        return Collections.emptyList();
+
+    }
+
+}
+
+public class MainClass{
+
+    public static void main(String[] args) {
+
+        RecentlyPlayedStore store = new RecentlyPlayedStore(3);
+
+        User user = new User("John");
+
+        Song song1 = new Song("S1");
+
+        Song song2 = new Song("S2");
+
+        Song song3 = new Song("S3");
+
+        Song song4 = new Song("S4");
+
+        store.addSong(user, song1);
+
+        store.addSong(user, song2);
+
+        store.addSong(user, song3);
+
+        System.out.println("Playlist: " + store.getRecentlyPlayedSongs(user));
+
+        store.addSong(user, song4);
+
+        System.out.println("Playlist after playing S4: " + store.getRecentlyPlayedSongs(user));
+
+        store.addSong(user, song2);
+
+        System.out.println("Playlist after playing S2: " + store.getRecentlyPlayedSongs(user));
+
+        store.addSong(user, song1);
+
+        System.out.println("Playlist after playing S1: " + store.getRecentlyPlayedSongs(user));
+
+    }
+
+}
