@@ -1,0 +1,25 @@
+import java.util.*;
+
+public class RecentlyPlayedStore {
+    private final int capacity;
+    private final Map<String, List<String>> store;
+
+    public RecentlyPlayedStore(int capacity) {
+        this.capacity = capacity;
+        this.store = new LinkedHashMap<>();
+    }
+
+    public void addSong(String user, String song) {
+        List<String> songs = store.getOrDefault(user, new ArrayList<>());
+        songs.add(song);
+        store.put(user, songs);
+
+        if (songs.size() > capacity) {
+            songs.remove(0); // Remove the least recently played song
+        }
+    }
+
+    public List<String> getRecentlyPlayedSongs(String user) {
+        return store.getOrDefault(user, new ArrayList<>());
+    }
+}
