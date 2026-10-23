@@ -1,0 +1,451 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+ content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Space Shooter</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  background: #050816;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  overflow: hidden;
+  touch-action: none;
+}
+
+h2 {
+  margin: 12px 0 6px;
+  color: #42f5ff;
+  letter-spacing: 2px;
+}
+
+#hud {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  max-width: 500px;
+  height: 60vh;
+  min-height: 300px;
+  max-height: 600px;
+  margin: 0 auto;
+  background: #080d24;
+  border: 2px solid #203b6b;
+  border-radius: 12px;
+  touch-action: none;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  margin: 14px auto;
+}
+
+button {
+  border: 2px solid #42f5ff;
+  background: #101d3a;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 16px;
+  padding: 17px 24px;
+  touch-action: none;
+  user-select: none;
+}
+
+button:active {
+  background: #12657b;
+  transform: scale(.96);
+}
+
+#fire {
+  background: #a31d43;
+  border-color: #ff648a;
+}
+
+#restart {
+  background: #087b67;
+  display: none;
+  margin: 10px auto;
+}
+
+#hint {
+  color: #a8b8dc;
+  font-size: 12px;
+  padding: 0 8px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🚀 SPACE SHOOTER</h2>
+
+<div id="hud">
+  <span>Score: <span id="score">0</span></span>
+  <span>❤️ HP: <span id="hp">100</span></span>
+  <span>Level: <span id="level">1</span></span>
+</div>
+
+<canvas id="game"></canvas>
+
+<div class="controls">
+  <button id="left">◀</button>
+  <button id="fire">🔥 FIRE</button>
+  <button id="right">▶</button>
+</div>
+
+<button id="restart">🔄 PLAY AGAIN</button>
+<p id="hint">Hold ◀ / ▶ to move · Hold FIRE to shoot</p>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreText = document.getElementById("score");
+const hpText = document.getElementById("hp");
+const levelText = document.getElementById("level");
+const restartBtn = document.getElementById("restart");
+
+let W = 0, H = 0;
+let player, bullets, enemies, stars;
+let score, hp, frame, gameOver, keys;
+let lastTime = 0;
+let spawnTimer = 0;
+let shootTimer = 0;
+
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  W = rect.width;
+  H = rect.height;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  if (player) {
+    player.x = Math.max(18, Math.min(W - 18, player.x));
+    player.y = H - 55;
+  }
+
+  if (!stars) makeStars();
+}
+
+function makeStars() {
+  stars = Array.from({ length: 65 }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    size: Math.random() * 2 + 0.5,
+    speed: Math.random() * 55 + 20
+  }));
+}
+
+function resetGame() {
+  player = { x: W / 2, y: H - 55, speed: 260 };
+  bullets = [];
+  enemies = [];
+  score = 0;
+  hp = 100;
+  frame = 0;
+  spawnTimer = 0;
+  shootTimer = 0;
+  gameOver = false;
+  keys = { left: false, right: false, fire: false };
+
+  scoreText.textContent = score;
+  hpText.textContent = hp;
+  levelText.textContent = 1;
+  restartBtn.style.display = "none";
+}
+
+function drawPlayer() {
+  ctx.save();
+  ctx.translate(player.x, player.y);
+
+  // Engine flame
+  ctx.fillStyle = "#ff9f43";
+  ctx.beginPath();
+  ctx.moveTo(-7, 13);
+  ctx.lineTo(0, 27 + Math.random() * 5);
+  ctx.lineTo(7, 13);
+  ctx.fill();
+
+  // Ship
+  ctx.fillStyle = "#42f5ff";
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(17, 14);
+  ctx.lineTo(0, 7);
+  ctx.lineTo(-17, 14);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.ellipse(0, -3, 4, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawEnemy(e) {
+  ctx.save();
+  ctx.translate(e.x, e.y);
+
+  ctx.fillStyle = e.color;
+  ctx.beginPath();
+  ctx.moveTo(0, 17);
+  ctx.lineTo(-17, -8);
+  ctx.lineTo(-7, -5);
+  ctx.lineTo(0, -16);
+  ctx.lineTo(7, -5);
+  ctx.lineTo(17, -8);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(-8, -5, 4, 4);
+  ctx.fillRect(4, -5, 4, 4);
+
+  ctx.restore();
+}
+
+function shoot() {
+  bullets.push({
+    x: player.x - 7, y: player.y - 15,
+    speed: 430
+  });
+  bullets.push({
+    x: player.x + 7, y: player.y - 15,
+    speed: 430
+  });
+}
+
+function spawnEnemy() {
+  const size = 15 + Math.random() * 5;
+  enemies.push({
+    x: size + Math.random() * (W - size * 2),
+    y: -25,
+    size,
+    speed: 75 + Math.random() * 45 + score * 0.25,
+    color: ["#ff4268", "#c56bff", "#ff963f"][
+      Math.floor(Math.random() * 3)
+    ],
+    drift: (Math.random() - 0.5) * 65
+  });
+}
+
+function update(dt) {
+  if (gameOver) return;
+
+  frame += dt;
+  spawnTimer += dt;
+  shootTimer -= dt;
+
+  if (keys.left) player.x -= player.speed * dt;
+  if (keys.right) player.x += player.speed * dt;
+
+  player.x = Math.max(19, Math.min(W - 19, player.x));
+
+  if (keys.fire && shootTimer <= 0) {
+    shoot();
+    shootTimer = 0.19;
+  }
+
+  // Spawn enemies more frequently at higher scores
+  const spawnRate = Math.max(0.32, 0.9 - score * 0.003);
+  if (spawnTimer >= spawnRate) {
+    spawnTimer = 0;
+    spawnEnemy();
+  }
+
+  stars.forEach(s => {
+    s.y += s.speed * dt;
+    if (s.y > H) {
+      s.y = 0;
+      s.x = Math.random() * W;
+    }
+  });
+
+  bullets.forEach(b => b.y -= b.speed * dt);
+  bullets = bullets.filter(b => b.y > -10);
+
+  enemies.forEach(e => {
+    e.y += e.speed * dt;
+    e.x += e.drift * dt;
+
+    if (e.x < e.size || e.x > W - e.size) {
+      e.drift *= -1;
+    }
+
+    // Enemy hits the player
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+
+    if (Math.hypot(dx, dy) < e.size + 12) {
+      e.dead = true;
+      hp -= 20;
+    } else if (e.y > H + 20) {
+      e.dead = true;
+      hp -= 10;
+    }
+
+    // Bullet hits enemy
+    bullets.forEach(b => {
+      if (!e.dead && !b.dead &&
+          Math.hypot(e.x - b.x, e.y - b.y) < e.size + 5) {
+        e.dead = true;
+        b.dead = true;
+        score += 10;
+      }
+    });
+  });
+
+  enemies = enemies.filter(e => !e.dead);
+  bullets = bullets.filter(b => !b.dead);
+
+  hp = Math.max(0, hp);
+  scoreText.textContent = score;
+  hpText.textContent = hp;
+  levelText.textContent = Math.floor(score / 100) + 1;
+
+  if (hp <= 0) endGame();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Space background
+  ctx.fillStyle = "#080d24";
+  ctx.fillRect(0, 0, W, H);
+
+  stars.forEach(s => {
+    ctx.fillStyle = "#b6d9ff";
+    ctx.globalAlpha = 0.4 + s.size / 4;
+    ctx.fillRect(s.x, s.y, s.size, s.size);
+  });
+  ctx.globalAlpha = 1;
+
+  // Player bullets
+  bullets.forEach(b => {
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "#42f5ff";
+    ctx.fillStyle = "#42f5ff";
+    ctx.fillRect(b.x - 2, b.y - 8, 4, 14);
+  });
+  ctx.shadowBlur = 0;
+
+  enemies.forEach(drawEnemy);
+
+  if (player) drawPlayer();
+
+  if (gameOver) {
+    ctx.fillStyle = "rgba(2, 5, 20, 0.78)";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ff5478";
+    ctx.font = "bold 32px Arial";
+    ctx.fillText("GAME OVER", W / 2, H / 2 - 25);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("Score: " + score, W / 2, H / 2 + 15);
+
+    ctx.font = "15px Arial";
+    ctx.fillText("Tap PLAY AGAIN to restart", W / 2, H / 2 + 45);
+  }
+}
+
+function endGame() {
+  gameOver = true;
+  keys.left = keys.right = keys.fire = false;
+  restartBtn.style.display = "block";
+}
+
+function loop(time) {
+  const dt = Math.min((time - lastTime) / 1000 || 0, 0.04);
+  lastTime = time;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// Mobile touch controls
+function bindHold(id, key) {
+  const btn = document.getElementById(id);
+
+  btn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    keys[key] = true;
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  const release = e => {
+    e.preventDefault();
+    keys[key] = false;
+  };
+
+  btn.addEventListener("pointerup", release);
+  btn.addEventListener("pointercancel", release);
+  btn.addEventListener("lostpointercapture", () => {
+    keys[key] = false;
+  });
+}
+
+bindHold("left", "left");
+bindHold("right", "right");
+bindHold("fire", "fire");
+
+restartBtn.addEventListener("click", resetGame);
+
+// Keyboard support for PC
+document.addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight", " ", "a", "d"].includes(e.key)) {
+    e.preventDefault();
+  }
+  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a")
+    keys.left = true;
+  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d")
+    keys.right = true;
+  if (e.key === " ") keys.fire = true;
+});
+
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a")
+    keys.left = false;
+  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d")
+    keys.right = false;
+  if (e.key === " ") keys.fire = false;
+});
+
+window.addEventListener("resize", resize);
+
+resize();
+resetGame();
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
